@@ -1,0 +1,119 @@
+{
+  "api_base_url": {
+    "description": "Iwara 主 API 地址",
+    "type": "string",
+    "hint": "默认 https://api.iwara.tv",
+    "default": "https://api.iwara.tv"
+  },
+  "file_api_base_url": {
+    "description": "Iwara 文件 API 地址",
+    "type": "string",
+    "hint": "默认 https://files.iwara.tv",
+    "default": "https://files.iwara.tv"
+  },
+  "site_host": {
+    "description": "请求头 X-Site 使用的站点域名",
+    "type": "string",
+    "hint": "默认 www.iwara.tv",
+    "default": "www.iwara.tv"
+  },
+  "proxy_url": {
+    "description": "可选代理地址（HTTP/HTTPS）",
+    "type": "string",
+    "hint": "例如 http://127.0.0.1:7890；留空则直连",
+    "default": ""
+  },
+  "request_engine": {
+    "description": "请求引擎",
+    "type": "string",
+    "hint": "auto / aiohttp / cloudscraper",
+    "default": "auto",
+    "options": [
+      "auto",
+      "aiohttp",
+      "cloudscraper"
+    ]
+  },
+  "image_transport": {
+    "description": "图片发送方式",
+    "type": "string",
+    "hint": "bytes / url（推荐 bytes，稳定）",
+    "default": "bytes",
+    "options": [
+      "bytes",
+      "url"
+    ]
+  },
+  "image_fetch_timeout_sec": {
+    "description": "图片下载超时（秒）",
+    "type": "int",
+    "hint": "3-30",
+    "default": 8
+  },
+  "image_max_kb": {
+    "description": "单张图片最大体积（KB）",
+    "type": "int",
+    "hint": "256-10240",
+    "default": 2048
+  },
+  "image_censor_level": {
+    "description": "返回图片打码程度",
+    "type": "string",
+    "hint": "off / low / medium / high",
+    "default": "off",
+    "options": [
+      "off",
+      "low",
+      "medium",
+      "high"
+    ]
+  },
+  "search_limit": {
+    "description": "搜索命令最多返回条数",
+    "type": "int",
+    "hint": "1-10",
+    "default": 5
+  },
+  "request_timeout_sec": {
+    "description": "请求超时时间（秒）",
+    "type": "int",
+    "hint": "5-60",
+    "default": 15
+  },
+  "request_user_agent": {
+    "description": "请求 User-Agent（用于降低风控误判）",
+    "type": "string",
+    "hint": "建议保留默认浏览器 UA",
+    "default": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+  },
+  "request_referer": {
+    "description": "请求 Referer",
+    "type": "string",
+    "hint": "默认 https://www.iwara.tv/",
+    "default": "https://www.iwara.tv/"
+  },
+  "request_origin": {
+    "description": "请求 Origin",
+    "type": "string",
+    "hint": "默认 https://www.iwara.tv",
+    "default": "https://www.iwara.tv"
+  },
+  "request_cookie": {
+    "description": "可选请求 Cookie（例如包含 cf_clearance）",
+    "type": "string",
+    "hint": "可从浏览器复制，留空则不发送",
+    "default": ""
+  },
+  "request_bearer_token": {
+    "description": "可选 Bearer Token（浏览器 localStorage 中的访问令牌）",
+    "type": "string",
+    "hint": "留空则不发送 Authorization",
+    "default": ""
+  },
+  "warmup_homepage": {
+    "description": "请求前先访问 Iwara 首页进行会话预热",
+    "type": "bool",
+    "hint": "建议开启，可提高通过风控概率",
+    "default": true
+  }
+}

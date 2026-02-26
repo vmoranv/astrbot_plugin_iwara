@@ -201,6 +201,12 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Local runtime/cache artifacts
+.iwara_playwright_profile/
+.tmp_repos/
+iwara_runtime_config.txt
+data/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
