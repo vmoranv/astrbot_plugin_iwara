@@ -1,0 +1,216 @@
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
+from astrbot.api import logger
+from astrbot.api.event import AstrMessageEvent, filter
+
+from .iwara_helpers import (
+    HTML_TAG_RE,
+    extract_command_payload,
+    extract_items,
+    extract_video_id,
+    get_int_config,
+    get_str_config,
+    proxy_url,
+    site_host,
+    get_text,
+)
+from .iwara_format import format_search_item, format_user_profile
+from .iwara_image import get_display_image_url, extract_avatar_url
+from .iwara_commands import make_chain, cloudscraper_available
+
+
+class SecondaryCommands:
+    @filter.command("iwara_diag")
+    async def iwara_diag(self, event: AstrMessageEvent):
+        """输出当前请求配置诊断信息。"""
+        cookie_text = get_str_config(self.config, "request_cookie", "")
+        bearer = get_str_config(self.config, "request_bearer_token", "")
+        px = proxy_url(self.config)
+        yield event.plain_result(
+            "\n".join(
+                [
+                    "Iwara 插件诊断",
+                    f"api_base_url: {get_str_config(self.config, 'api_base_url', 'https://api.iwara.tv')}",
+                    f"file_api_base_url: {get_str_config(self.config, 'file_api_base_url', 'https://files.iwara.tv')}",
+                    f"request_engine: {get_str_config(self.config, 'request_engine', 'auto')}",
+                    f"cloudscraper_available: {cloudscraper_available()}",
+                    f"image_transport: {get_str_config(self.config, 'image_transport', 'bytes')}",
+                    f"proxy_url: {'已配置' if px else '未配置'}",
+                    f"warmup_homepage: {get_str_config(self.config, 'warmup_homepage', 'true')}",
+                    f"user_agent_len: {len(get_str_config(self.config, 'request_user_agent', ''))}",
+                    f"cookie_len: {len(cookie_text)}",
+                    f"cookie_has_cf_clearance: {'cf_clearance=' in cookie_text}",
+                    f"bearer_token: {'已配置' if bearer else '未配置'}",
+                    f"warmup_done: {self._api._warmup_done}",
+                ]
+            )
+        )
+
+    @filter.command("iwara_probe")
+    async def iwara_probe(self, event: AstrMessageEvent):
+        """探测端点可达性。"""
+        from .iwara_probe import run_probe
+
+        try:
+            yield event.plain_result(await run_probe(self._api))
+        except Exception as exc:
+            logger.error(f"iwara_probe failed: {exc}")
+            yield event.plain_result(f"Iwara 探测失败：{exc}")
+
+    @filter.command("iwara_related")
+    async def iwara_related(self, event: AstrMessageEvent):
+        """查询相关视频。/iwara_related <视频ID或链接>"""
+        video_id = extract_video_id(
+            extract_command_payload(event.message_str, "iwara_related")
+        )
+        if not video_id:
+            yield event.plain_result("用法：/iwara_related <视频ID或链接>")
+            return
+        try:
+            items = extract_items(
+                await self._api.get_json(f"/video/{video_id}/related")
+            )
+            if not items:
+                yield event.plain_result("未找到相关视频。")
+                return
+            limit = get_int_config(self.config, "search_limit", 5, 1, 10)
+            host = site_host(self.config)
+            for idx, item in enumerate(items[:limit], start=1):
+                yield await make_chain(
+                    event,
+                    self.config,
+                    self._api,
+                    format_search_item(idx, item, "video", host),
+                    get_display_image_url(item),
+                )
+        except Exception as exc:
+            logger.error(f"iwara_related failed: {exc}")
+            yield event.plain_result(f"查询相关视频失败：{exc}")
+
+    @filter.command("iwara_comments")
+    async def iwara_comments(self, event: AstrMessageEvent):
+        """查询视频评论。/iwara_comments <视频ID或链接>"""
+        video_id = extract_video_id(
+            extract_command_payload(event.message_str, "iwara_comments")
+        )
+        if not video_id:
+            yield event.plain_result("用法：/iwara_comments <视频ID或链接>")
+            return
+        try:
+            from .iwara_helpers import extract_author
+
+            items = extract_items(
+                await self._api.get_json(
+                    f"/video/{video_id}/comments", params={"page": 0}
+                )
+            )
+            if not items:
+                yield event.plain_result("该视频暂无评论。")
+                return
+            limit = get_int_config(self.config, "search_limit", 5, 1, 10)
+            lines = [f"视频 {video_id} 的评论："]
+            for idx, item in enumerate(items[:limit], start=1):
+                body = (
+                    get_text(item, "body")
+                    or get_text(item, "content")
+                    or get_text(item, "text")
+                )
+                body = HTML_TAG_RE.sub(" ", body).strip()
+                lines.append(
+                    f"[{idx}] {extract_author(item)} ({get_text(item, 'createdAt', '-')}): {body[:120]}"
+                )
+            yield event.plain_result("\n".join(lines))
+        except Exception as exc:
+            logger.error(f"iwara_comments failed: {exc}")
+            yield event.plain_result(f"查询评论失败：{exc}")
+
+    @filter.command("iwara_likes")
+    async def iwara_likes(self, event: AstrMessageEvent):
+        """查询视频点赞用户。/iwara_likes <视频ID或链接>"""
+        video_id = extract_video_id(
+            extract_command_payload(event.message_str, "iwara_likes")
+        )
+        if not video_id:
+            yield event.plain_result("用法：/iwara_likes <视频ID或链接>")
+            return
+        try:
+            from .iwara_helpers import extract_author
+
+            limit = get_int_config(self.config, "search_limit", 5, 1, 10)
+            items = extract_items(
+                await self._api.get_json(
+                    f"/video/{video_id}/likes", params={"page": 0, "limit": limit}
+                )
+            )
+            if not items:
+                yield event.plain_result("该视频暂无点赞。")
+                return
+            lines = [f"视频 {video_id} 的点赞用户："]
+            for idx, item in enumerate(items, start=1):
+                lines.append(f"[{idx}] {extract_author(item)}")
+            yield event.plain_result("\n".join(lines))
+        except Exception as exc:
+            logger.error(f"iwara_likes failed: {exc}")
+            yield event.plain_result(f"查询点赞失败：{exc}")
+
+    @filter.command("iwara_trending")
+    async def iwara_trending(self, event: AstrMessageEvent):
+        """查询热门内容。/iwara_trending [video|image|all]"""
+        payload = (
+            extract_command_payload(event.message_str, "iwara_trending").strip().lower()
+        )
+        media_type = payload if payload in {"video", "image", "all"} else "video"
+        limit = get_int_config(self.config, "search_limit", 5, 1, 10)
+        types = ["video", "image"] if media_type == "all" else [media_type]
+        all_items: List[Dict[str, Any]] = []
+        errors: List[str] = []
+        for t in types:
+            try:
+                items = extract_items(
+                    await self._api.get_json(
+                        f"/trending/{t}", params={"rating": "all", "limit": limit}
+                    )
+                )
+                for item in items:
+                    item["_media_type"] = t
+                all_items.extend(items)
+            except Exception as exc:
+                errors.append(f"{t}={exc}")
+        if not all_items and errors:
+            yield event.plain_result(f"获取热门内容失败：{'; '.join(errors)}")
+            return
+        if not all_items:
+            yield event.plain_result("暂无热门内容。")
+            return
+        host = site_host(self.config)
+        for idx, item in enumerate(all_items[:limit], start=1):
+            t = str(item.get("_media_type", media_type))
+            yield await make_chain(
+                event,
+                self.config,
+                self._api,
+                format_search_item(idx, item, t, host),
+                get_display_image_url(item),
+            )
+
+    @filter.command("iwara_user")
+    async def iwara_user(self, event: AstrMessageEvent):
+        """查询用户信息。/iwara_user <用户名>"""
+        query = extract_command_payload(event.message_str, "iwara_user").strip()
+        if not query:
+            yield event.plain_result("用法：/iwara_user <用户名>")
+            return
+        try:
+            data = await self._api.get_json(f"/profile/{query}")
+            yield await make_chain(
+                event,
+                self.config,
+                self._api,
+                format_user_profile(data, query, site_host(self.config)),
+                extract_avatar_url(data),
+            )
+        except Exception as exc:
+            logger.error(f"iwara_user failed: {exc}")
+            yield event.plain_result(f"查询用户失败：{exc}")
