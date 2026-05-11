@@ -191,7 +191,7 @@ class IwaraPlugin(Star):
                     f"cookie_len: {len(cookie_text)}",
                     f"cookie_has_cf_clearance: {'cf_clearance=' in cookie_text}",
                     f"bearer_token: {'已配置' if bearer else '未配置'}",
-                    f"warmup_done: {self._api._warmup_done}",
+                    f"warmup_done: {self._api.warmup_done}",
                 ]
             )
         )
@@ -286,17 +286,17 @@ class IwaraPlugin(Star):
         try:
             from .iwara_helpers import extract_author
 
-            limit = get_int_config(self.config, "search_limit", 5, 1, 10)
+            display_limit = get_int_config(self.config, "search_limit", 5, 1, 10)
             items = extract_items(
                 await self._api.get_json(
-                    f"/video/{video_id}/likes", params={"page": 0, "limit": limit}
+                    f"/video/{video_id}/likes", params={"page": 0, "limit": 20}
                 )
             )
             if not items:
                 yield event.plain_result("该视频暂无点赞。")
                 return
             lines = [f"视频 {video_id} 的点赞用户："]
-            for idx, item in enumerate(items, start=1):
+            for idx, item in enumerate(items[:display_limit], start=1):
                 lines.append(f"[{idx}] {extract_author(item)}")
             yield event.plain_result("\n".join(lines))
         except Exception as exc:
@@ -311,8 +311,8 @@ class IwaraPlugin(Star):
         )
         media_type = payload if payload in {"video", "image", "all"} else "video"
         limit = get_int_config(self.config, "search_limit", 5, 1, 10)
-        types = ["video", "image"] if media_type == "all" else [media_type]
-        all_items: List[Dict[str, Any]] = []
+        types: List[str] = ["video", "image"] if media_type == "all" else [media_type]
+        buckets: Dict[str, List[Dict[str, Any]]] = {}
         errors: List[str] = []
         for t in types:
             try:
@@ -323,17 +323,24 @@ class IwaraPlugin(Star):
                 )
                 for item in items:
                     item["_media_type"] = t
-                all_items.extend(items)
+                buckets[t] = items
             except Exception as exc:
                 errors.append(f"{t}={exc}")
-        if not all_items and errors:
+        if not any(buckets.values()) and errors:
             yield event.plain_result(f"获取热门内容失败：{'; '.join(errors)}")
             return
-        if not all_items:
+        if not any(buckets.values()):
             yield event.plain_result("暂无热门内容。")
             return
+        # interleave: video, image, video, image, ...
+        interleaved: List[Dict[str, Any]] = []
+        max_len = max((len(v) for v in buckets.values()), default=0)
+        for i in range(max_len):
+            for t in types:
+                if t in buckets and i < len(buckets[t]):
+                    interleaved.append(buckets[t][i])
         host = site_host(self.config)
-        for idx, item in enumerate(all_items[:limit], start=1):
+        for idx, item in enumerate(interleaved[:limit], start=1):
             t = str(item.get("_media_type", media_type))
             yield await make_chain(
                 event,
