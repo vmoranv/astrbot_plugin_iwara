@@ -40,9 +40,6 @@ from .iwara_commands import (
 )
 
 
-@register(
-    "astrbot_plugin_iwara", "vmoranv", "Iwara 视频/图片查询与直链解析插件", "1.1.0"
-)
 class IwaraPlugin(Star):
     def __init__(self, context: Context, config: Optional[Dict[str, Any]] = None):
         super().__init__(context)
