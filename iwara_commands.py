@@ -78,7 +78,7 @@ async def search_by_type(
 ) -> List[Dict[str, Any]]:
     try:
         data = await api.get_json(
-            "/search", params={"query": keyword, "type": media_type}
+            "/search", params={"query": keyword, "type": media_type + "s"}
         )
         items = extract_items(data, [f"{media_type}s", "results", "items"])
         if items:
