@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -28,14 +29,20 @@ from .iwara_image import (
 )
 
 
+_VALID_SORTS = ("relevance", "date", "views", "likes")
+
+
 async def search_items(
-    api: IwaraAPI, config: Dict[str, Any], keyword: str, media_type: str, limit: int
+    api: IwaraAPI, config: Dict[str, Any], keyword: str, media_type: str, limit: int,
+    sort: str = "random",
 ) -> List[Dict[str, Any]]:
     keyword = keyword.strip()
     if not keyword:
         return []
     if media_type not in {"video", "image", "all"}:
         media_type = "all"
+    if sort not in _VALID_SORTS and sort != "random":
+        sort = "random"
     if media_type == "all":
         vl, il = max(1, (limit + 1) // 2), max(1, limit - (limit + 1) // 2)
         v_exc: Optional[Exception] = None
@@ -43,11 +50,11 @@ async def search_items(
         videos: List[Dict[str, Any]] = []
         images: List[Dict[str, Any]] = []
         try:
-            videos = await search_by_type(api, config, keyword, "video", vl)
+            videos = await search_by_type(api, config, keyword, "video", vl, sort)
         except Exception as exc:
             v_exc = exc
         try:
-            images = await search_by_type(api, config, keyword, "image", il)
+            images = await search_by_type(api, config, keyword, "image", il, sort)
         except Exception as exc:
             i_exc = exc
         if not videos and not images and (v_exc or i_exc):
@@ -67,21 +74,27 @@ async def search_items(
         for item in images:
             item["_media_type"] = "image"
         return (videos + images)[:limit]
-    items = await search_by_type(api, config, keyword, media_type, limit)
+    items = await search_by_type(api, config, keyword, media_type, limit, sort)
     for item in items:
         item["_media_type"] = media_type
     return items
 
 
 async def search_by_type(
-    api: IwaraAPI, config: Dict[str, Any], keyword: str, media_type: str, limit: int
+    api: IwaraAPI, config: Dict[str, Any], keyword: str, media_type: str, limit: int,
+    sort: str = "relevance",
 ) -> List[Dict[str, Any]]:
+    shuffle_results = sort == "random"
+    api_sort = random.choice(_VALID_SORTS) if shuffle_results else sort
+    fetch_limit = max(limit * 3, 15) if shuffle_results else limit
     try:
         data = await api.get_json(
-            "/search", params={"query": keyword, "type": media_type + "s"}
+            "/search", params={"query": keyword, "type": media_type + "s", "sort": api_sort, "limit": fetch_limit}
         )
         items = extract_items(data, [f"{media_type}s", "results", "items"])
         if items:
+            if shuffle_results:
+                random.shuffle(items)
             return items[:limit]
     except Exception as exc:
         logger.warning(f"Iwara /search fallback ({media_type}): {exc}")
@@ -91,11 +104,14 @@ async def search_by_type(
     )
     items = extract_items(listing, [f"{media_type}s", "results", "items"])
     lowered = keyword.lower()
-    return [
+    filtered = [
         item
         for item in items
         if lowered in get_text(item, "title").lower()
-    ][:limit]
+    ]
+    if shuffle_results:
+        random.shuffle(filtered)
+    return filtered[:limit]
 
 
 async def fetch_quality_list(
