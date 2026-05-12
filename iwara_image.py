@@ -28,6 +28,14 @@ def get_display_image_url(data: Dict[str, Any]) -> Optional[str]:
         if file_id:
             cover_url = build_file_thumbnail_url(file_id, thumb_idx, "thumbnail")
     if not cover_url:
+        # For image items, thumbnail is an object {id, name}
+        thumbnail = data.get("thumbnail")
+        if isinstance(thumbnail, dict):
+            tid = str(thumbnail.get("id", "")).strip()
+            tname = str(thumbnail.get("name", "")).strip()
+            if tid and tname:
+                cover_url = f"https://i.iwara.tv/image/thumbnail/{tid}/{tname}"
+    if not cover_url:
         content_id = get_text(data, "id", default="")
         if content_id:
             cover_url = (
