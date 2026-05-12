@@ -44,17 +44,16 @@ async def search_items(
     if sort not in _VALID_SORTS and sort != "random":
         sort = "random"
     if media_type == "all":
-        vl, il = max(1, (limit + 1) // 2), max(1, limit - (limit + 1) // 2)
         v_exc: Optional[Exception] = None
         i_exc: Optional[Exception] = None
         videos: List[Dict[str, Any]] = []
         images: List[Dict[str, Any]] = []
         try:
-            videos = await search_by_type(api, config, keyword, "video", vl, sort)
+            videos = await search_by_type(api, config, keyword, "video", limit, sort)
         except Exception as exc:
             v_exc = exc
         try:
-            images = await search_by_type(api, config, keyword, "image", il, sort)
+            images = await search_by_type(api, config, keyword, "image", limit, sort)
         except Exception as exc:
             i_exc = exc
         if not videos and not images and (v_exc or i_exc):
@@ -73,7 +72,13 @@ async def search_items(
             item["_media_type"] = "video"
         for item in images:
             item["_media_type"] = "image"
-        return (videos + images)[:limit]
+        combined: List[Dict[str, Any]] = []
+        for i in range(max(len(videos), len(images))):
+            if i < len(videos):
+                combined.append(videos[i])
+            if i < len(images):
+                combined.append(images[i])
+        return combined[:limit]
     items = await search_by_type(api, config, keyword, media_type, limit, sort)
     for item in items:
         item["_media_type"] = media_type
