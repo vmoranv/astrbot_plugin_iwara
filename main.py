@@ -103,11 +103,10 @@ class IwaraPlugin(Star):
             except Exception as e:
                 logger.error(f"渲染 UI 失败: {e}")
                 yield event.plain_result(
-                    f"UI 渲染失败，请检查环境 (例如是否缺少Pillow库): {e}"
+                    f"UI 渲染失败，请检查环境 (例如是否缺少Pillow库): {e}已为您自动降级为图文模式。"
                 )
-
+                self.use_image_ui = False
         else:
-
             for idx, item in enumerate(items, start=1):
                 text = format_search_item(
                     idx, item, str(item.get("_media_type", media_type)), host

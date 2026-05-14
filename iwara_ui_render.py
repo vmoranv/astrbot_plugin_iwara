@@ -4,7 +4,7 @@ import os
 import re
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Tuple
-
+from astrbot.api import logger
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont, ImageChops
 
@@ -64,8 +64,8 @@ def load_font(size: int) -> ImageFont.ImageFont:
                 return ImageFont.truetype(path, size)
             except Exception:
                 continue
-
-    print(
+            
+    logger.warning(
         "WARNING (Iwara Plugin): 未找到任何可用的中文字体，UI 渲染将出现豆腐块！请在 fonts 目录下补充 wqy-microhei.ttc"
     )
     return ImageFont.load_default()
