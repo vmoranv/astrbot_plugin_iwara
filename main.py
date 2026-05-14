@@ -405,9 +405,16 @@ class IwaraPlugin(Star):
     @filter.command("iwara_ui")
     async def iwara_ui_toggle(self, event: AstrMessageEvent):
         """切换 Iwara 搜索的图文 UI 模式。"""
-        self.use_image_ui = not self.use_image_ui
-        status = (
-            "已开启 (图片海报模式)" if self.use_image_ui else "已关闭 (经典图文模式)"
-        )
-        self.config["use_image_ui"] = self.use_image_ui
+        # 直接操作 config 源数据
+        current_val = self.config.get("use_image_ui", True)
+        new_val = not current_val
+        
+        # 更新
+        self.config["use_image_ui"] = new_val
+        self.use_image_ui = new_val # 同步内部变量
+        
+        # 保存
+        self.config.save_config()
+        
+        status = "已开启 (图片海报模式)" if new_val else "已关闭 (经典图文模式)"
         yield event.plain_result(f"Iwara UI 界面 {status}")
