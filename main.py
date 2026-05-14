@@ -409,4 +409,5 @@ class IwaraPlugin(Star):
         status = (
             "已开启 (图片海报模式)" if self.use_image_ui else "已关闭 (经典图文模式)"
         )
+        self.config["use_image_ui"] = self.use_image_ui
         yield event.plain_result(f"Iwara UI 界面 {status}")
