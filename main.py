@@ -1,4 +1,8 @@
 from __future__ import annotations
+import os
+
+from .iwara_ui_render import render_search_ui
+import astrbot.api.message_components as Comp
 
 from typing import Any, Dict, List, Optional
 
@@ -45,6 +49,12 @@ class IwaraPlugin(Star):
         super().__init__(context)
         self.config = config or {}
         self._api = IwaraAPI(config)
+        self.use_image_ui = config.get("use_image_ui", True)
+
+        self.background_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "backgrounds"
+        )
+        os.makedirs(self.background_dir, exist_ok=True)
 
     async def initialize(self):
         logger.info("astrbot_plugin_iwara initialized.")
@@ -60,7 +70,7 @@ class IwaraPlugin(Star):
         if not keyword:
             yield event.plain_result("用法：/iwara_search [video|image|all] <关键词>")
             return
-        limit = get_int_config(self.config, "search_limit", 5, 1, 10)
+        limit = get_int_config(self.config, "search_limit", 6, 1, 10)
         try:
             items = await search_items(
                 self._api, self.config, keyword, media_type, limit
@@ -73,14 +83,38 @@ class IwaraPlugin(Star):
             yield event.plain_result(f'没有找到与"{keyword}"相关的内容。')
             return
         host = site_host(self.config)
-        for idx, item in enumerate(items, start=1):
-            text = format_search_item(
-                idx, item, str(item.get("_media_type", media_type)), host
-            )
-            image_url = await resolve_cover_url(
-                self._api, item, str(item.get("_media_type", media_type))
-            )
-            yield await make_chain(event, self.config, self._api, text, image_url)
+
+        if self.use_image_ui:
+            yield event.plain_result("正在渲染 UI 界面，请稍候...")
+            try:
+
+                bg_path = os.path.join(self.background_dir, "bg.png")
+
+                image_bytes = await render_search_ui(
+                    items=items,
+                    keyword=keyword,
+                    config=self.config,
+                    resolve_cover_func=resolve_cover_url,
+                    extract_avatar_func=extract_avatar_url,
+                    api=self._api,
+                    bg_path=bg_path,
+                )
+                yield event.chain_result([Comp.Image.fromBytes(image_bytes)])
+            except Exception as e:
+                logger.error(f"渲染 UI 失败: {e}")
+                yield event.plain_result(
+                    f"UI 渲染失败，请检查环境 (例如是否缺少Pillow库): {e}已为您自动降级为图文模式。"
+                )
+                self.use_image_ui = False
+        else:
+            for idx, item in enumerate(items, start=1):
+                text = format_search_item(
+                    idx, item, str(item.get("_media_type", media_type)), host
+                )
+                image_url = await resolve_cover_url(
+                    self._api, item, str(item.get("_media_type", media_type))
+                )
+                yield await make_chain(event, self.config, self._api, text, image_url)
 
     @filter.command("iwara_video")
     async def iwara_video(self, event: AstrMessageEvent):
@@ -366,3 +400,20 @@ class IwaraPlugin(Star):
         except Exception as exc:
             logger.error(f"iwara_user failed: {exc}")
             yield event.plain_result(f"查询用户失败：{exc}")
+
+    @filter.command("iwara_ui")
+    async def iwara_ui_toggle(self, event: AstrMessageEvent):
+        """切换 Iwara 搜索的图文 UI 模式。"""
+        # 直接操作 config 源数据
+        current_val = self.config.get("use_image_ui", True)
+        new_val = not current_val
+        
+        # 更新
+        self.config["use_image_ui"] = new_val
+        self.use_image_ui = new_val # 同步内部变量
+        
+        # 保存
+        self.config.save_config()
+        
+        status = "已开启 (图片海报模式)" if new_val else "已关闭 (经典图文模式)"
+        yield event.plain_result(f"Iwara UI 界面 {status}")

@@ -24,6 +24,7 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 - `/iwara_user <用户名>`
 - `/iwara_probe`
 - `/iwara_diag`
+- `/iwara_ui`
 
 示例：
 

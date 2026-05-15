@@ -72,7 +72,7 @@
     "description": "搜索命令最多返回条数",
     "type": "int",
     "hint": "1-10",
-    "default": 5
+    "default": 6
   },
   "request_timeout_sec": {
     "description": "请求超时时间（秒）",
@@ -115,5 +115,12 @@
     "type": "bool",
     "hint": "建议开启，可提高通过风控概率",
     "default": true
+  },
+  "use_image_ui": {
+    "description": "在支持图片 UI 的平台上启用图片界面",
+    "type": "bool",
+    "hint": "开启后在支持的平台上以更美观的方式展示图片",
+    "default": true
   }
+
 }
