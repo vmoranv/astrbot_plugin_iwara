@@ -153,14 +153,27 @@ async def handle_userimages(plugin, event):
 # ── subscribe / unsubscribe / list ──────────────────────
 
 async def handle_sub(plugin, event):
-    """订阅博主更新。/iwara_sub <用户名>"""
+    """订阅博主更新。/iwara_sub <用户名> [atme|atall]"""
     if plugin._store is None:
         yield event.plain_result("订阅功能未初始化。")
         return
-    username = extract_command_payload(event.message_str, "iwara_sub").strip()
-    if not username:
-        yield event.plain_result("用法：/iwara_sub <用户名>")
+    payload = extract_command_payload(event.message_str, "iwara_sub").strip()
+    parts = payload.split()
+    if not parts:
+        yield event.plain_result("用法：/iwara_sub <用户名> [atme|atall]")
         return
+    username = parts[0]
+    at_mode = "off"
+    if len(parts) >= 2:
+        selector = parts[1].lower()
+        if selector == "atme":
+            at_mode = "atme"
+        elif selector == "atall":
+            at_mode = "atall"
+        else:
+            yield event.plain_result("无效的 @ 模式，可选：atme | atall（留空则不@）")
+            return
+    sender_id = event.get_sender_id()
     try:
         profile = await plugin._api.get_json(f"/profile/{username}")
     except Exception as exc:
@@ -171,8 +184,16 @@ async def handle_sub(plugin, event):
     if not user_id:
         yield event.plain_result(f"未找到用户 {username}。")
         return
-    plugin._store.add_subscription(username, user_id, str(event.session))
-    yield event.plain_result(f"✅ 已订阅 {username}！有新视频/图片时会通知你。")
+    plugin._store.add_subscription(
+        username, user_id, str(event.session), at_mode=at_mode, sender_id=sender_id
+    )
+    mode_label = {"off": "不@", "atme": "@你", "atall": "@全体"}.get(at_mode, "不@")
+    hint = ""
+    if at_mode == "atme" and not sender_id:
+        hint = "\n⚠️ 当前平台无法获取你的 ID，@可能不生效。"
+    yield event.plain_result(
+        f"✅ 已订阅 {username}！有新视频/图片时会通知你（{mode_label}）。{hint}"
+    )
 
 
 async def handle_unsub(plugin, event):
@@ -234,15 +255,34 @@ async def poll_all_subscriptions(plugin):
 async def _notify_subscribers(plugin, entry: Dict[str, Any], text: str, image_url: Optional[str]):
     """Send notification to all subscribers of *entry*."""
     from astrbot.core.message.message_event_result import MessageChain
-    from astrbot.core.message.components import Plain
+    from astrbot.api.message_components import At, AtAll, Plain
 
     for sub in entry.get("subscribers", []):
         session_str = sub.get("session_str", "")
         if not session_str:
             continue
+        at_mode = sub.get("at_mode", "off")
+        sender_id = sub.get("sender_id", "")
+        is_private = "FriendMessage" in session_str
+
+        # 私聊跳过
+        at_comp = None
+        if not is_private and at_mode == "atme" and sender_id:
+            at_comp = At(qq=sender_id)
+        elif not is_private and at_mode == "atall":
+            at_comp = AtAll()
+
+        if at_comp is not None:
+            try:
+                chain = MessageChain(chain=[at_comp, Plain(text=text)])  # type: ignore
+                await plugin.context.send_message(session_str, chain)
+                continue
+            except Exception as exc:
+                logger.warning(f"notify {session_str} with at failed, fallback plain: {exc}")
+        
         try:
-            chain = MessageChain(chain=[Plain(text=text)])
-            await plugin.context.send_message(session_str, chain)
+            plain_chain = MessageChain(chain=[Plain(text=text)])
+            await plugin.context.send_message(session_str, plain_chain)
         except Exception as exc:
             logger.warning(f"notify {session_str} failed: {exc}")
 
