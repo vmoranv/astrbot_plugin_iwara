@@ -135,13 +135,13 @@ class SubscriptionStore:
         entry = self._data.get("subscriptions", {}).get(username, {})
         return list(entry.get("known_image_ids", []))
 
-    def list_subscriptions_for_session(self, session_str: str) -> List[str]:
-        """Return usernames that *session_str* is subscribed to."""
-        result: List[str] = []
+    def list_subscriptions_for_session(self, session_str: str) -> List[tuple]:
+        """Return (username, at_mode) pairs that *session_str* is subscribed to."""
+        result: List[tuple] = []
         for uname, entry in self._data.get("subscriptions", {}).items():
             for s in entry.get("subscribers", []):
                 if s.get("session_str") == session_str:
-                    result.append(uname)
+                    result.append((uname, s.get("at_mode", "off")))
                     break
         return result
 

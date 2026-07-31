@@ -187,13 +187,16 @@ async def handle_sub(plugin, event):
     plugin._store.add_subscription(
         username, user_id, str(event.session), at_mode=at_mode, sender_id=sender_id
     )
-    mode_label = {"off": "不@", "atme": "@你", "atall": "@全体"}.get(at_mode, "不@")
     hint = ""
     if at_mode == "atme" and not sender_id:
         hint = "\n⚠️ 当前平台无法获取你的 ID，@可能不生效。"
-    yield event.plain_result(
-        f"✅ 已订阅 {username}！有新视频/图片时会通知你（{mode_label}）。{hint}"
-    )
+    if at_mode == "off":
+        msg = f"✅ 已订阅 {username}！"
+    elif at_mode == "atme":
+        msg = f"✅ 已订阅 {username}！有新视频/图片时会通知你"
+    else:
+        msg = f"✅ 已订阅 {username}！有新视频/图片时会通知全体成员"
+    yield event.plain_result(msg + hint)
 
 
 async def handle_unsub(plugin, event):
@@ -214,12 +217,17 @@ async def handle_sublist(plugin, event):
     if plugin._store is None:
         yield event.plain_result("订阅功能未初始化。")
         return
-    usernames = plugin._store.list_subscriptions_for_session(str(event.session))
-    if not usernames:
+    subs = plugin._store.list_subscriptions_for_session(str(event.session))
+    if not subs:
         yield event.plain_result("你还没有订阅任何博主。\n使用 /iwara_sub <用户名> 订阅。")
         return
-    yield event.plain_result(
-        "\n".join(["你的订阅列表："] + [f"[{idx}] {name}" for idx, name in enumerate(usernames, start=1)]))
+    _AT_LABELS = {"atme": "(@你)", "atall": "(@全体成员)"}
+    lines = [f"[{idx}] {name} {_AT_LABELS.get(mode, '')}" for idx, (name, mode) in enumerate(subs, start=1)]
+    yield event.plain_result("\n".join(["你的订阅列表："] + lines))
+    # 你的订阅列表
+    # [1] 用户1              没有订阅 @ 时
+    # [2] 用户2 (@你)         有订阅 @ 自己时
+    # [3] 用户3 (@全体成员)  有订阅 @全体成员时
 
 
 # ── poll loop ───────────────────────────────────────────
@@ -274,7 +282,7 @@ async def _notify_subscribers(plugin, entry: Dict[str, Any], text: str, image_ur
 
         if at_comp is not None:
             try:
-                chain = MessageChain(chain=[at_comp, Plain(text=text)])  # type: ignore
+                chain = MessageChain(chain=[at_comp, Plain(text="\n" + text)])  # type: ignore
                 await plugin.context.send_message(session_str, chain)
                 continue
             except Exception as exc:
