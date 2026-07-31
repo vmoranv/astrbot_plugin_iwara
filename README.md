@@ -32,7 +32,7 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 - `/iwara_probe`
 - `/iwara_diag`
 - **订阅相关：**
-  - `/iwara_sub <用户名> [atme|atall]` — 订阅博主更新
+  - `/iwara_sub <用户名> [选择器]` — 订阅博主更新
   > 选择器支持的值：
   > - 留空 = 不@
   > - atme = @订阅者
