@@ -20,7 +20,7 @@ class SubscriptionStore:
               "known_video_ids": ["..."],
               "known_image_ids": ["..."],
               "subscribers": [
-                {"session_str": "aiocqhttp:GroupMessage:123456"}
+                {"session_str": "aiocqhttp:GroupMessage:123456", "at_mode": "off", "sender_id": ""}
               ]
             }
           }
@@ -66,6 +66,8 @@ class SubscriptionStore:
         username: str,
         user_id: str,
         session_str: str,
+        at_mode: str = "off",
+        sender_id: str = "",
     ) -> None:
         """Add a subscriber for *username*. Creates entry if new."""
         subs = self._data.setdefault("subscriptions", {})
@@ -78,9 +80,15 @@ class SubscriptionStore:
         # deduplicate
         for s in entry["subscribers"]:
             if s.get("session_str") == session_str:
+                s["at_mode"] = at_mode
+                s["sender_id"] = sender_id
                 self._flush()
                 return
-        entry["subscribers"].append({"session_str": session_str})
+        entry["subscribers"].append({
+            "session_str": session_str,
+            "at_mode": at_mode,
+            "sender_id": sender_id,
+        })
         self._flush()
 
     def remove_subscription(self, username: str, session_str: str) -> bool:
@@ -127,13 +135,13 @@ class SubscriptionStore:
         entry = self._data.get("subscriptions", {}).get(username, {})
         return list(entry.get("known_image_ids", []))
 
-    def list_subscriptions_for_session(self, session_str: str) -> List[str]:
-        """Return usernames that *session_str* is subscribed to."""
-        result: List[str] = []
+    def list_subscriptions_for_session(self, session_str: str) -> List[tuple]:
+        """Return (username, at_mode) pairs that *session_str* is subscribed to."""
+        result: List[tuple] = []
         for uname, entry in self._data.get("subscriptions", {}).items():
             for s in entry.get("subscribers", []):
                 if s.get("session_str") == session_str:
-                    result.append(uname)
+                    result.append((uname, s.get("at_mode", "off")))
                     break
         return result
 

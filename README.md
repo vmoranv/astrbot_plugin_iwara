@@ -32,7 +32,14 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 - `/iwara_probe`
 - `/iwara_diag`
 - **订阅相关：**
-  - `/iwara_sub <用户名>` — 订阅博主更新
+  - `/iwara_sub <用户名> [选择器]` — 订阅博主更新
+  > 选择器支持的值：
+  > - 留空 = 不@
+  > - atme = @订阅者
+  > - atall = @全体成员
+  >
+  > 重复订阅会更新模式，不传选择器重置为关闭
+  
   - `/iwara_unsub <用户名>` — 取消订阅
   - `/iwara_sublist` — 查看当前订阅列表
 
@@ -50,7 +57,9 @@ Iwara (`www.iwara.tv`) AstrBot 插件，支持：
 - `/iwara_userimages nightmate71` — 查看用户的所有图片
 - `/iwara_followers nightmate71` — 查看用户的粉丝
 - `/iwara_following nightmate71` — 查看用户的关注
-- `/iwara_sub nightmate71` — 订阅博主
+- `/iwara_sub nightmate71` — 订阅博主（不@）
+- `/iwara_sub nightmate71 atme` — 订阅并 @订阅者本人
+- `/iwara_sub nightmate71 atall` — 订阅并 @全体成员
 - `/iwara_sublist` — 查看订阅列表
 - `/iwara_probe`
 
